@@ -18,6 +18,7 @@ use DigitalOceanV2\Exception\InvalidRecordException;
 /**
  * @author Yassir Hannoun <yassir.hannoun@gmail.com>
  * @author Graham Campbell <graham@alt-three.com>
+ * @author Swengeer <swengeer@codejigsaw.com>
  */
 class DomainRecord extends AbstractApi
 {
@@ -34,9 +35,25 @@ class DomainRecord extends AbstractApi
 
         $this->extractMeta($domainRecords);
 
-        return array_map(function ($domainRecord) {
-            return new DomainRecordEntity($domainRecord);
-        }, $domainRecords->domain_records);
+        // map the domain record entities array 
+        $domainRecordsArray = array_map(function ($domainRecord) {
+                                    return new DomainRecordEntity($domainRecord);
+                                }, $domainRecords->domain_records);
+
+        // as long as links to pages, specifically link to next page is detected, keep retrieving the next page link, fetch domain records and append to array
+        while (isset($domainRecords->links) &&  $domainRecords->links && isset($domainRecords->links->pages) && $domainRecords->links->pages && 
+                isset($domainRecords->links->pages->next) && $domainRecords->links->pages->next) {
+            $domainRecords = $this->adapter->get($domainRecords->links->pages->next);       // fetch the next page link
+            $domainRecords = json_decode($domainRecords);                                   // decode JSON response
+            //$this->extractMeta($domainRecords);   //<- should be the same meta data
+            // map domain record entities array
+            $moreDomainRecordsArray = array_map(function ($domainRecord) {
+                                                    return new DomainRecordEntity($domainRecord);
+                                                }, $domainRecords->domain_records);
+            $domainRecordsArray = array_merge($domainRecordsArray, $moreDomainRecordsArray);    // merge to the returning set of domain record entities
+        }
+
+        return $domainRecordsArray;
     }
 
     /**
